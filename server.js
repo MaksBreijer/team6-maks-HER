@@ -169,65 +169,321 @@ app.get("/fout-inlog", function (req, res) {
 })
 
 
-//**********Account aanmaken plus toevoegen in mongo**********
-app.post('/add-account',upload.single('profielFoto'), async (req, res) => {
-  //Je maakt een database aan in je mongo de naam van de collectie zet je tussen de "" 
-    const database = client.db("klanten")
-    const gebruiker = database.collection("user")
-
-    //const aanmaken om een hash te creëren voor het wachtwoord
-    const hashedPassword = await bcrypt.hash(req.body.password, 10)
-
-    let filename 
-
-  if (req.file && req.file.filename) {
-    filename = req.file.filename
-  } else {
-    filename = "profiel-placeholder.png" //een afbeelding toevoegen..
-  }
-
-    //Om daadwerkelijk een _ID te krijgen maak je een doc aan met daarin de gegevens, in dit geval haalt hij de gegevens op uit de form
-    const doc = { 
-        name: xss(req.body.name),            
-        emailadress: xss(req.body.email), 
-        //Xss is niet nodig voor de password omdat daar al de bcrypt voor gebruikt wordt
-        password: hashedPassword,
-        profielFoto: (filename),
-        //alvast een lege array ter voorbereiding 
-        favorieten: [ ], 
+//**********Account aanmaken plus toevoegen in mongo met validatie**********
+app.post('/add-account', upload.single('profielFoto'), async (req, res) => {
+  try {
+    // Validatie functie
+    const validateAccountData = (data) => {
+      const errors = [];
+      
+      // Naam validatie
+      if (!data.name || data.name.trim().length < 2) {
+        errors.push('Naam moet minimaal 2 karakters bevatten');
       }
+      if (data.name && data.name.length > 50) {
+        errors.push('Naam mag maximaal 50 karakters bevatten');
+      }
+      
+      // Email validatie
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!data.email || !emailRegex.test(data.email)) {
+        errors.push('Voer een geldig e-mailadres in');
+      }
+      
+      // Wachtwoord validatie
+      if (!data.password || data.password.length < 6) {
+        errors.push('Wachtwoord moet minimaal 6 karakters bevatten');
+      }
+      if (data.password && data.password.length > 128) {
+        errors.push('Wachtwoord mag maximaal 128 karakters bevatten');
+      }
+      
+      // Sterkere wachtwoord validatie (optioneel)
+      const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/;
+      if (data.password && !strongPasswordRegex.test(data.password)) {
+        errors.push('Wachtwoord moet minimaal één hoofdletter, kleine letter, cijfer en speciaal teken bevatten');
+      }
+      
+      return errors;
+    };
+    
+    // Valideer de input data
+    const validationErrors = validateAccountData(req.body);
+    
+    if (validationErrors.length > 0) {
+      return res.status(400).render('pages/aanmelden', {
+        errors: validationErrors,
+        formData: req.body // Behoud form data voor betere UX
+      });
+    }
+    
+    // Database connectie
+    const database = client.db("klanten");
+    const gebruiker = database.collection("user");
+    
+    // Controleer of email al bestaat
+    const existingUser = await gebruiker.findOne({ emailadress: req.body.email.toLowerCase() });
+    if (existingUser) {
+      return res.status(400).render('pages/aanmelden', {
+        errors: ['Dit e-mailadres is al in gebruik'],
+        formData: req.body
+      });
+    }
+    
+    // Hash het wachtwoord
+    const hashedPassword = await bcrypt.hash(req.body.password, 12); // Verhoogd naar 12 voor betere beveiliging
+    
+    // Bestandsnaam bepalen
+    let filename;
+    if (req.file && req.file.filename) {
+      // Valideer bestandstype
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+      if (!allowedTypes.includes(req.file.mimetype)) {
+        return res.status(400).render('pages/aanmelden', {
+          errors: ['Alleen JPG, JPEG en PNG bestanden zijn toegestaan'],
+          formData: req.body
+        });
+      }
+      
+      // Valideer bestandsgrootte (bijvoorbeeld max 5MB)
+      if (req.file.size > 5 * 1024 * 1024) {
+        return res.status(400).render('pages/aanmelden', {
+          errors: ['Bestand mag maximaal 5MB groot zijn'],
+          formData: req.body
+        });
+      }
+      
+      filename = req.file.filename;
+    } else {
+      filename = "profiel-placeholder.png";
+    }
+    
+    // Document aanmaken
+    const doc = {
+      name: xss(req.body.name.trim()),
+      emailadress: xss(req.body.email.toLowerCase().trim()),
+      password: hashedPassword,
+      profielFoto: filename,
+      favorieten: [],
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    
+    // Document toevoegen aan database
+    const toevoegen = await gebruiker.insertOne(doc);
+    
+    console.log(`A document was inserted with the _id: ${toevoegen.insertedId}`);
+    
+    if (toevoegen.insertedId) {
+      // De nieuwe gebruiker vinden in de database
+      const newUser = await gebruiker.findOne({ emailadress: doc.emailadress });
+      
+      if (newUser) {
+        console.log("Gebruiker is gevonden na het toevoegen");
+        
+        // Sessie aanmaken (zonder wachtwoord)
+        req.session.user = {
+          _id: newUser._id,
+          name: newUser.name,
+          emailadress: newUser.emailadress,
+          profielFoto: newUser.profielFoto,
+          favorieten: newUser.favorieten
+        };
+        
+        // Doorsturen naar profiel pagina
+        res.redirect("/profiel");
+      } else {
+        throw new Error('Gebruiker niet gevonden na toevoegen');
+      }
+    } else {
+      throw new Error('Fout bij het toevoegen van de gebruiker');
+    }
+    
+  } catch (error) {
+    console.error('Error bij account aanmaken:', error);
+    res.status(500).render('pages/aanmelden', {
+      errors: ['Er is een onverwachte fout opgetreden. Probeer het opnieuw.'],
+      formData: req.body
+    });
+  }
+});
+
+// Client-side validatie voor aanmelden form
+document.addEventListener('DOMContentLoaded', function() {
+  const form = document.getElementById('accountForm');
+  const nameInput = document.getElementById('name');
+  const emailInput = document.getElementById('email');
+  const passwordInput = document.getElementById('password');
+  const fileInput = document.getElementById('profielFoto');
   
-    //Om het document toe te voegen in de database de volgende code
-    const toevoegen = await gebruiker.insertOne(doc)
+  // Real-time wachtwoord validatie
+  passwordInput.addEventListener('input', function() {
+    const password = this.value;
+    
+    // Controleer elke requirement
+    const lengthReq = document.getElementById('length-req');
+    const upperReq = document.getElementById('upper-req');
+    const lowerReq = document.getElementById('lower-req');
+    const numberReq = document.getElementById('number-req');
+    const specialReq = document.getElementById('special-req');
+    
+    // Length check
+    if (password.length >= 6) {
+      lengthReq.classList.add('valid');
+      lengthReq.classList.remove('invalid');
+    } else {
+      lengthReq.classList.add('invalid');
+      lengthReq.classList.remove('valid');
+    }
+    
+    // Uppercase check
+    if (/[A-Z]/.test(password)) {
+      upperReq.classList.add('valid');
+      upperReq.classList.remove('invalid');
+    } else {
+      upperReq.classList.add('invalid');
+      upperReq.classList.remove('valid');
+    }
+    
+    // Lowercase check
+    if (/[a-z]/.test(password)) {
+      lowerReq.classList.add('valid');
+      lowerReq.classList.remove('invalid');
+    } else {
+      lowerReq.classList.add('invalid');
+      lowerReq.classList.remove('valid');
+    }
+    
+    // Number check
+    if (/\d/.test(password)) {
+      numberReq.classList.add('valid');
+      numberReq.classList.remove('invalid');
+    } else {
+      numberReq.classList.add('invalid');
+      numberReq.classList.remove('valid');
+    }
+    
+    // Special character check
+    if (/[@$!%*?&]/.test(password)) {
+      specialReq.classList.add('valid');
+      specialReq.classList.remove('invalid');
+    } else {
+      specialReq.classList.add('invalid');
+      specialReq.classList.remove('valid');
+    }
+  });
+  
+  // Bestand validatie
+  fileInput.addEventListener('change', function() {
+    const file = this.files[0];
+    const errorSpan = document.getElementById('file-error');
+    
+    if (file) {
+      // Controleer bestandstype
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+      if (!allowedTypes.includes(file.type)) {
+        errorSpan.textContent = 'Alleen JPG, JPEG en PNG bestanden zijn toegestaan';
+        this.value = '';
+        return;
+      }
+      
+      // Controleer bestandsgrootte (5MB max)
+      if (file.size > 5 * 1024 * 1024) {
+        errorSpan.textContent = 'Bestand mag maximaal 5MB groot zijn';
+        this.value = '';
+        return;
+      }
+      
+      errorSpan.textContent = '';
+    }
+  });
+  
+  // Naam validatie (real-time)
+  nameInput.addEventListener('blur', function() {
+    const errorSpan = document.getElementById('name-error');
+    if (this.value.trim().length < 2) {
+      errorSpan.textContent = 'Naam moet minimaal 2 karakters bevatten';
+    } else {
+      errorSpan.textContent = '';
+    }
+  });
+  
+  // Email validatie (real-time)
+  emailInput.addEventListener('blur', function() {
+    const errorSpan = document.getElementById('email-error');
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(this.value)) {
+      errorSpan.textContent = 'Voer een geldig e-mailadres in';
+    } else {
+      errorSpan.textContent = '';
+    }
+  });
+  
+  // Form submit validatie
+  form.addEventListener('submit', function(e) {
+    let isValid = true;
+    
+    // Clear previous errors
+    document.querySelectorAll('.error-message').forEach(span => {
+      span.textContent = '';
+    });
+    
+    // Naam validatie
+    if (nameInput.value.trim().length < 2) {
+      document.getElementById('name-error').textContent = 'Naam moet minimaal 2 karakters bevatten';
+      isValid = false;
+    }
+    
+    // Email validatie
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(emailInput.value)) {
+      document.getElementById('email-error').textContent = 'Voer een geldig e-mailadres in';
+      isValid = false;
+    }
+    
+    // Wachtwoord validatie
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{6,}$/;
+    if (!passwordRegex.test(passwordInput.value)) {
+      document.getElementById('password-error').textContent = 'Wachtwoord voldoet niet aan de eisen';
+      isValid = false;
+    }
+    
+    // Voorkom form submit als validatie faalt
+    if (!isValid) {
+      e.preventDefault();
+      
+      // Scroll naar eerste error
+      const firstError = document.querySelector('.error-message:not(:empty)');
+      if (firstError) {
+        firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    } else {
+      // Disable button om dubbele submissions te voorkomen
+      const submitButton = form.querySelector('button[type="submit"]');
+      submitButton.disabled = true;
+      submitButton.textContent = 'Bezig met aanmelden...';
+    }
+  });
+  
+  // Helper functie om alle wachtwoord requirements te checken
+  function checkAllPasswordRequirements() {
+    const password = passwordInput.value;
+    const requirements = [
+      { id: 'length-req', test: password.length >= 6 },
+      { id: 'upper-req', test: /[A-Z]/.test(password) },
+      { id: 'lower-req', test: /[a-z]/.test(password) },
+      { id: 'number-req', test: /\d/.test(password) },
+      { id: 'special-req', test: /[@$!%*?&]/.test(password) }
+    ];
+    
+    return requirements.every(req => req.test);
+  }
+});
 
-    //Even loggen om te checken of er een ID is aangemaakt
-    console.log(`A document was inserted with the _id: ${toevoegen.insertedId}`)
-
-    //controleren of er daadwerkelijk een user is toegevoegd
-        if (toevoegen.insertedId){
-          //De nieuwe gebruiker vinden in de database
-          const newUser = await gebruiker.findOne({ emailadress: doc.emailadress })
-
-          //controleren of de gebruiker bestaat
-          if (newUser) {
-            console.log("Gebruiker is gevonden na het toevoegen")
-          }
-          //de gebruiker in een session zetten
-          req.session.user = newUser 
-
-          //Na het aanmaken van de session meteen doorsturen naar profiel pagina met daarin de gegevens van de gebruiker
-          res.redirect("/profiel")
-        } else {
-          //Dit werkt helemaal nog niet :(
-          res.send(`Oops er ging iets fout.`)
-        }
-  })
-
-
-//Route voor de form van het acount aanmaken
+// Route voor de form van het account aanmaken
 app.get("/aanmelden", (req, res) => {
-  res.render("pages/aanmelden")
-})
+  res.render("pages/aanmelden", { errors: null, formData: {} });
+});
 
 
 //**********inloggen en check via mongo**********

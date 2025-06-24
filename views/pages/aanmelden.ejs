@@ -2,6 +2,7 @@
 <html lang="nl">
   <head>
     <%- include('../partials/head'); %>
+    <link rel="stylesheet" href="/css/aanmelden.css">
   </head>
   <body class="container">
 
@@ -11,21 +12,88 @@
 
     <!-- Even code om account aanmaak backend te testen, pas maar aan, maar laat de name of hetzelfde of pas deze ook aan in de server.js -->
     <main>
+      
       <div class="accountAanmaken">
           <div>
             <h1>Aanmelden</h1>
-            <form action="/add-account" method="post" enctype="multipart/form-data">
-              <label for="name">Naam</label>
-              <input name="name" type="text" >
-        
-              <label for="e-mailadress">E-mailadres</label>
-              <input name="email" type="email" required>
-        
-              <label for="password">Password</label>
-              <input name="password" type="password" required>
+            
+            <!-- Toon server-side validatie errors -->
+            <% if (locals.errors && errors.length > 0) { %>
+              <div class="error-list">
+                <strong>Er zijn fouten opgetreden:</strong>
+                <ul>
+                  <% errors.forEach(function(error) { %>
+                    <li><%= error %></li>
+                  <% }); %>
+                </ul>
+              </div>
+            <% } %>
+            
+            <form action="/add-account" method="post" enctype="multipart/form-data" id="accountForm" novalidate>
+              
+              <div class="form-group">
+                <label for="name">Naam *</label>
+                <input 
+                  name="name" 
+                  id="name"
+                  type="text" 
+                  required 
+                  minlength="2" 
+                  maxlength="50"
+                  value="<%= locals.formData && formData.name ? formData.name : '' %>"
+                  pattern="[A-Za-z\s]{2,50}"
+                  title="Naam moet minimaal 2 karakters bevatten en mag alleen letters en spaties bevatten"
+                >
+                <span class="error-message" id="name-error"></span>
+              </div>
 
-              <label for="profiel-foto">Selecteer een foto voor je profiel</label>
-              <input type="file" name="profielFoto" accept=".jpg, .jpeg, .png" />
+              <div class="form-group">
+                <label for="email">E-mailadres *</label>
+                <input 
+                  name="email" 
+                  id="email"
+                  type="email" 
+                  required
+                  value="<%= locals.formData && formData.email ? formData.email : '' %>"
+                  pattern="[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$"
+                  title="Voer een geldig e-mailadres in"
+                >
+                <span class="error-message" id="email-error"></span>
+              </div>
+
+              <div class="form-group">
+                <label for="password">Wachtwoord *</label>
+                <input 
+                  name="password" 
+                  id="password"
+                  type="password" 
+                  required
+                  minlength="6"
+                  maxlength="128"
+                  pattern="^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{6,}$"
+                  title="Wachtwoord moet minimaal 6 karakters bevatten met hoofdletter, kleine letter, cijfer en speciaal teken"
+                >
+                <div class="password-requirements">
+                  <span class="requirement" id="length-req">• Minimaal 6 karakters</span>
+                  <span class="requirement" id="upper-req">• Minimaal één hoofdletter</span>
+                  <span class="requirement" id="lower-req">• Minimaal één kleine letter</span>
+                  <span class="requirement" id="number-req">• Minimaal één cijfer</span>
+                  <span class="requirement" id="special-req">• Minimaal één speciaal teken (@$!%*?&)</span>
+                </div>
+                <span class="error-message" id="password-error"></span>
+              </div>
+
+              <div class="form-group">
+                <label for="profielFoto">Selecteer een foto voor je profiel</label>
+                <input 
+                  type="file" 
+                  name="profielFoto" 
+                  id="profielFoto"
+                  accept=".jpg,.jpeg,.png"
+                  title="Alleen JPG, JPEG en PNG bestanden zijn toegestaan (max 5MB)"
+                >
+                <span class="error-message" id="file-error"></span>
+              </div>
 
               <button type="submit" value="Send Request">Aanmelden</button>
             </form>
@@ -37,7 +105,9 @@
     <footer>
       <%- include('../partials/footer'); %>
     </footer>
+    
     <%- include('../partials/script'); %>
+    <script src="/js/aanmelden.js"></script>
   </body>
 
 </html>
