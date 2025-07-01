@@ -107,14 +107,7 @@
                   accept=".jpg,.jpeg,.png"
                   class="<%= typeof errors !== 'undefined' && errors.some(error => error.field === 'profielFoto') ? 'input-error' : '' %>"
                 />
-                <div class="requirements">
-                  <strong>Bestandsvereisten:</strong>
-                  <ul>
-                    <li>Toegestande formaten: JPG, JPEG, PNG</li>
-                    <li>Maximale bestandsgrootte: 5MB</li>
-                    <li>Aanbevolen afmetingen: 400x400 pixels</li>
-                  </ul>
-                </div>
+             
                 <% if (typeof errors !== 'undefined' && errors.some(error => error.field === 'profielFoto')) { %>
                   <% errors.filter(error => error.field === 'profielFoto').forEach(error => { %>
                     <span class="error">⚠ <%= error.message %></span>
