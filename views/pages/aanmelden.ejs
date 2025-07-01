@@ -1,35 +1,133 @@
 <!DOCTYPE html>
 <html lang="nl">
-  <head>
-    <%- include('../partials/head'); %>
-  </head>
+<head>
+   <%- include('../partials/head'); %>
+</head>
+
   <body class="container">
 
     <header>
       <%- include('../partials/header'); %>
     </header>
 
-    <!-- Even code om account aanmaak backend te testen, pas maar aan, maar laat de name of hetzelfde of pas deze ook aan in de server.js -->
     <main>
       <div class="accountAanmaken">
           <div>
-            <h1>Aanmelden</h1>
-            <form action="/add-account" method="post" enctype="multipart/form-data">
-              <label for="name">Naam</label>
-              <input name="name" type="text" >
+            <h1>Account Aanmaken</h1>
+            
+            <!-- Toon algemene foutmeldingen -->
+            <% if (typeof errors !== 'undefined' && errors.some(error => error.field === 'general')) { %>
+              <div class="general-error">
+                <strong>Er ging iets mis:</strong>
+                <% errors.filter(error => error.field === 'general').forEach(error => { %>
+                  <br><%= error.message %>
+                <% }) %>
+              </div>
+            <% } %>
+            
+            <!-- Toon succesmelding indien aanwezig -->
+            <% if (typeof successMessage !== 'undefined' && successMessage) { %>
+              <div class="success">
+                <%= successMessage %>
+              </div>
+            <% } %>
+            
+            <form action="/add-account" method="post" enctype="multipart/form-data" novalidate>
+              
+              <!-- Naam veld -->
+              <div class="form-group <%= typeof errors !== 'undefined' && errors.some(error => error.field === 'name') ? 'has-error' : '' %>">
+                <label for="name">Volledige naam *</label>
+                <input 
+                  name="name" 
+                  type="text" 
+                  id="name"
+                  placeholder="Voer je volledige naam in"
+                  value="<%= typeof formData !== 'undefined' ? formData.name || '' : '' %>"
+                  class="<%= typeof errors !== 'undefined' && errors.some(error => error.field === 'name') ? 'input-error' : '' %>"
+                  required
+                  maxlength="50"
+                >
+                <% if (typeof errors !== 'undefined' && errors.some(error => error.field === 'name')) { %>
+                  <% errors.filter(error => error.field === 'name').forEach(error => { %>
+                    <span class="error">⚠ <%= error.message %></span>
+                  <% }) %>
+                <% } %>
+              </div>
         
-              <label for="e-mailadress">E-mailadres</label>
-              <input name="email" type="email" required>
+              <!-- Email veld -->
+              <div class="form-group <%= typeof errors !== 'undefined' && errors.some(error => error.field === 'email') ? 'has-error' : '' %>">
+                <label for="email">E-mailadres *</label>
+                <input 
+                  name="email" 
+                  type="email" 
+                  id="email"
+                  placeholder="bijvoorbeeld@email.nl"
+                  value="<%= typeof formData !== 'undefined' ? formData.email || '' : '' %>"
+                  class="<%= typeof errors !== 'undefined' && errors.some(error => error.field === 'email') ? 'input-error' : '' %>"
+                  required
+                  maxlength="254"
+                >
+                <% if (typeof errors !== 'undefined' && errors.some(error => error.field === 'email')) { %>
+                  <% errors.filter(error => error.field === 'email').forEach(error => { %>
+                    <span class="error">⚠ <%= error.message %></span>
+                  <% }) %>
+                <% } %>
+              </div>
         
-              <label for="password">Password</label>
-              <input name="password" type="password" required>
+              <!-- Wachtwoord veld -->
+              <div class="form-group <%= typeof errors !== 'undefined' && errors.some(error => error.field === 'password') ? 'has-error' : '' %>">
+                <label for="password">Wachtwoord *</label>
+                <input 
+                  name="password" 
+                  type="password" 
+                  id="password"
+                  placeholder="Kies een sterk wachtwoord"
+                  class="<%= typeof errors !== 'undefined' && errors.some(error => error.field === 'password') ? 'input-error' : '' %>"
+                  required
+                  maxlength="128"
+                >
+                <div class="requirements">
+                  <strong>Wachtwoordvereisten:</strong>
 
-              <label for="profiel-foto">Selecteer een foto voor je profiel</label>
-              <input type="file" name="profielFoto" accept=".jpg, .jpeg, .png" />
+                </div>
+                <% if (typeof errors !== 'undefined' && errors.some(error => error.field === 'password')) { %>
+                  <% errors.filter(error => error.field === 'password').forEach(error => { %>
+                    <span class="error">⚠ <%= error.message %></span>
+                  <% }) %>
+                <% } %>
+              </div>
 
-              <button type="submit" value="Send Request">Aanmelden</button>
+              <!-- Profielfoto veld -->
+              <div class="form-group <%= typeof errors !== 'undefined' && errors.some(error => error.field === 'profielFoto') ? 'has-error' : '' %>">
+                <label for="profielFoto">Profielfoto (optioneel)</label>
+                <input 
+                  type="file" 
+                  name="profielFoto" 
+                  id="profielFoto"
+                  accept=".jpg,.jpeg,.png"
+                  class="<%= typeof errors !== 'undefined' && errors.some(error => error.field === 'profielFoto') ? 'input-error' : '' %>"
+                />
+                <div class="requirements">
+                  <strong>Bestandsvereisten:</strong>
+                  <ul>
+                    <li>Toegestande formaten: JPG, JPEG, PNG</li>
+                    <li>Maximale bestandsgrootte: 5MB</li>
+                    <li>Aanbevolen afmetingen: 400x400 pixels</li>
+                  </ul>
+                </div>
+                <% if (typeof errors !== 'undefined' && errors.some(error => error.field === 'profielFoto')) { %>
+                  <% errors.filter(error => error.field === 'profielFoto').forEach(error => { %>
+                    <span class="error">⚠ <%= error.message %></span>
+                  <% }) %>
+                <% } %>
+              </div>
+
+              <button type="submit">Account Aanmaken</button>
             </form>
-            <p>Al een account? <a href="/inlog">Inloggen</a></p>
+            
+            <div class="login-link">
+              <p>Heb je al een account? <a href="/inlog">Log hier in</a></p>
+            </div>
           </div>
       </div>
     </main>
@@ -39,5 +137,4 @@
     </footer>
     <%- include('../partials/script'); %>
   </body>
-
 </html>

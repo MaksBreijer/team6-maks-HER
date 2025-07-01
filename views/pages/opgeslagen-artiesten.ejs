@@ -12,26 +12,25 @@
 
     <main class="opgeslagen-artiesten-pagina">
       <h1>Mijn Opgeslagen Artiesten</h1>
-      
-      
+
       <form action="">
         <input type="search" id="search" class="search" placeholder="Zoek Artiest...">
       </form>
-      
+
       <button class="sort" data-sort="name">Sorteer op naam (A → Z)</button>
       <button class="sort-low" data-sort="name">Sorteer op naam (Z → A)</button>
       <button class="sort-popularity" data-sort="popularity">Sorteer op populariteit (hoog → laag)</button>
 
-
       <div id="account-opgeslagen-artiest-grid">
-        <ul class="list">
+        <ul class="list" id="draggable-list">
           <% if (user && artiesten.length > 0) { %>
             <% artiesten.forEach(artiest => { %>
-              <li class="grid-item"> 
+              <li class="grid-item" data-id="<%= artiest.id %>">
                 <img src="<%= artiest.images[0].url %>" alt="Foto van <%= artiest.name %>">
                 <h3><span class="name"><%= artiest.name %></span></h3>
-                <p> <span class="genre">Genre: <%= artiest.genres %></span></p>
+                <p><span class="genre">Genre: <%= artiest.genres %></span></p>
                 <p>Populariteit: <span class="popularity"><%= artiest.popularity %></span></p>
+
                 <form action="/opgeslagen-artiesten" method="POST">
                   <input name="artistId" value="<%= artiest.id %>" type="hidden">
                   <div class="grid-item-container">
@@ -54,7 +53,6 @@
     </footer>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/list.js/2.3.1/list.min.js"></script>
-    <script src="static/javascript/frontend.js"></script>
-    
+    <script src="/static/javascript/frontend.js"></script>
   </body>
 </html>
